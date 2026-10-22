@@ -20,7 +20,7 @@ tracks ──► diffusionkit.gridpost ──► per-track posterior over D     
 | # | Explainer | Built on | What is new here |
 |---|---|---|---|
 | 01 | [Detection and fitting](01_detection.md) | DAOPHOT FIND (Stetson 1987), u-track's `pointSourceDetection` (Aguet 2013), sCMOS shifted-Poisson likelihood (Huang 2013) | Quasi-likelihood from a fitted noise curve, efficient-score proposals for mixtures, a detection bar from Efron's two groups with a random-field null over position *and width* |
-| 02 | [Linking](02_linking.md) | u-track's LAP frame-to-frame linker (Jaqaman 2008), Crocker & Grier (1996) | A per-track posterior over D in the link cost, an end cost derived from what the movie shows, an occupancy prior for immobile spots, forward/backward consensus, per-strength classes |
+| 02 | [Linking](02_linking.md) | u-track's LAP frame-to-frame linker (Jaqaman 2008), Crocker & Grier (1996), BP link marginals (Williams & Lau 2014) | A per-track posterior over D in the link cost, an end cost derived from what the movie shows, an occupancy prior for immobile spots, forward/backward consensus, per-strength classes, a search radius read from pair counts, per-link probabilities (`link_p`) from both passes |
 | 03 | [Brownian D per track](03_brownian_D.md) | Michalet & Berglund (2012), Berglund (2010), Relich et al. (2016) | Mostly standard; the novelty is in how it is used (grid posterior, reporting the floor and the grid edge) |
 | 04 | [Anomalous α (fBm)](04_alpha_fbm.md) | fractional Brownian motion likelihood (e.g. Lysy et al. 2016) | Exact blurred-fGn covariance, profile likelihood over the amplitude, pooled α by summed profiles |
 | 04b | [What each step teaches](04b_information.md) | Fisher information and the Cramér–Rao bound; Michalet & Berglund (2012) | Information gained per track in bits, side by side for D and α, and the MSD's efficiency against the bound |
@@ -36,7 +36,7 @@ These are the places where reading the code against the figures turned up someth
 
 1. **The spatial-class fit could get stuck and pick the wrong number of classes** ([06](06_spatial_classes.md#5-how-the-old-fit-broke-and-what-changed)). The cause is the Potts model's known phase transition: the old code learned β without the normalising constant, so β ran past it. [diffusionkit PR #6](https://github.com/delnatan/diffusionkit/pull/6) (merged, superseding PR #4) drops the class weights and fits β by its exact EM step; it picks the right number of classes on all 14 simulated two- and three-region cells.
 2. **The detection bar's noise model under-predicts noise maxima** by about 1.35–1.5× near z = 3–4 on Gaussian noise with the width search, and by more on Poisson noise ([01](01_detection.md#how-good-is-the-null)). The effect is that P(real) reads slightly optimistic, so u sits a little low.
-3. **The linker's threshold acts as a hard radius that grows more severe with D**, so fast tracks are cut and D read from linked tracks is biased low ([02](02_linking.md#the-price-of-a-hard-threshold)).
+3. **The linker's threshold acts as a hard radius that grows more severe with D**, so fast tracks are cut and D read from linked tracks is biased low ([02](02_linking.md#the-price-of-a-hard-threshold)). `switch_cost` is now the knob for it: lowering it recovers fast links at the price of more swaps ([02](02_linking.md#what-switch_cost-trades)), and `link_p` marks the doubtful ones.
 4. **Short tracks near the localization floor under-cover at a fixed true D** ([03](03_brownian_D.md#calibration)). This is the flat prior in ln D at work, not a bug.
 5. **Small documentation mismatches.**
    - `docs/gridpost.md` still describes an eigen-whitening that the Brownian likelihood no longer uses; the code uses an LDLᵀ recursion. The eigen-whitening is in `fbmpost`.
@@ -45,7 +45,7 @@ These are the places where reading the code against the figures turned up someth
 
 ## Re-running the figures
 
-Every figure is made by a short script in `scripts/` that calls the real packages (spotsolve 0.6.0, diffusionkit main at e49cb19). The scripts were run from the `scripts/` folder:
+Every figure is made by a short script in `scripts/` that calls the real packages (spotsolve 0.6.0, diffusionkit main at e49cb19). Explainer 02's figures use spotsolve's unreleased linking changes (PRs #4 and #5), which add `search_radius`, `switch_cost` and `link_p`; `sim_02.py` holds its simulated movie. The scripts were run from the `scripts/` folder:
 
 ```bash
 cd scripts

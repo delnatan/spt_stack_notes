@@ -9,7 +9,7 @@ from scipy.special import logsumexp
 from common import C, plt, save
 
 N_D, FORGET, SWITCH = 8, 0.05, 2.5
-R, se = 12.0, 0.3                          # max_step (px) and localization SE per axis
+R, se = 12.0, 0.3                          # search radius (px) and localization SE per axis
 se2 = se ** 2
 d_lo, d_hi = se2 / 8, max(R * R / 36 - se2, 2 * se2 / 8)
 Dk = d_lo * (d_hi / d_lo) ** (np.arange(N_D) / (N_D - 1))

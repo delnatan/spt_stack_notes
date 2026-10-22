@@ -1,6 +1,7 @@
 """Shared plotting style and paths for the explainer figures.
 
-Run any script from this folder with spotsolve 0.6.0 and diffusionkit (main) installed:
+Run any script from this folder with spotsolve 0.6.0 and diffusionkit (main) installed (explainer 02's
+figures need spotsolve's unreleased linking changes, PRs #4 and #5: `search_radius`, `switch_cost`, `link_p`):
     python fig_01_pipeline.py
 Figures are written to ../figures.
 """

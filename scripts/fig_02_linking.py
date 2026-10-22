@@ -1,4 +1,4 @@
-"""Figure 2.2: spotsolve.link (real, v0.6.0) against Crocker-Grier's least squared displacement on a simulated
+"""Figure 2.2: spotsolve.link (real; radius read from the movie) against Crocker-Grier's least squared displacement on a simulated
 movie that mixes immobile, slow and fast particles, the case the per-track scale is built for.
 
 Crocker-Grier here is one frame-pair assignment minimizing summed squared steps, with ending a track priced at
@@ -10,27 +10,11 @@ from scipy.optimize import linear_sum_assignment
 
 import spotsolve
 from common import C, plt, save
+from sim_02 import CLASSES, SE, movie, rms_step, score
 
-rng = np.random.default_rng(11)
-L, T, se = 128.0, 60, 0.3
-classes = {"immobile": (40, 0.0), "slow": (60, 0.3), "fast": (30, 3.0)}   # (count, D px²/frame)
-rows = []
-pid = 0
-for name, (n, D) in classes.items():
-    for _ in range(n):
-        p = rng.uniform(5, L - 5, 2)
-        pdet = rng.uniform(0.6, 0.99)
-        for t in range(T):
-            if t:
-                p = p + rng.normal(0, np.sqrt(2 * D), 2)
-                p = np.abs(p); p = L - np.abs(L - p)      # reflect at the edges
-            if rng.random() < pdet:
-                o = p + rng.normal(0, se, 2)
-                rows.append((t, o[0], o[1], se, se, pid, name))
-        pid += 1
-locs = pl.DataFrame(rows, schema=["frame", "y", "x", "se_y", "se_x", "particle", "cls"], orient="row")
-fast_rms = np.sqrt(4 * 3.0 + 4 * se ** 2)
-R = 3 * fast_rms
+locs = movie()
+classes, se = CLASSES, SE
+R_rule = 3 * rms_step(3.0)                  # 3x the fast rms step: the rule a given radius follows
 
 
 def crocker_grier(locs, radius):
@@ -60,28 +44,12 @@ def crocker_grier(locs, radius):
     return tid
 
 
-def score(df, tid):
-    df = df.with_columns(pl.Series("tid", tid)).sort("particle", "frame")
-    out = {}
-    nxt = df.with_columns(pl.col("frame").shift(-1).over("particle").alias("f2"),
-                          pl.col("tid").shift(-1).over("particle").alias("t2"))
-    true_links = nxt.filter(pl.col("f2") == pl.col("frame") + 1)
-    links = df.sort("tid", "frame").with_columns(pl.col("frame").shift(-1).over("tid").alias("f2"),
-                                                pl.col("particle").shift(-1).over("tid").alias("p2"))
-    links = links.filter(pl.col("f2") == pl.col("frame") + 1)
-    for name in classes:
-        tl = true_links.filter(pl.col("cls") == name)
-        rec = (tl["tid"] == tl["t2"]).mean()
-        lk = links.filter(pl.col("cls") == name)
-        sw = 100 * (lk["particle"] != lk["p2"]).mean()
-        out[name] = (rec, sw)
-    return out
-
-
 res = {}
-ss = spotsolve.link(locs.select("frame", "y", "x", "se_y", "se_x"), max_step=R)
-res["spotsolve.link, max_step = 3× fast rms"] = score(locs, ss["track_id"].to_numpy())
-for rad, lab in [(R, "Crocker-Grier, same radius"), (3 * np.sqrt(4 * 0.3 + 4 * se ** 2), "Crocker-Grier, 3× slow rms")]:
+table = locs.select("frame", "y", "x", "se_y", "se_x")
+R = spotsolve.search_radius(table)
+ss = spotsolve.link(table)                  # the radius read from the movie, the default
+res["spotsolve.link, radius read from the movie"] = score(locs, ss["track_id"].to_numpy())
+for rad, lab in [(R, "Crocker-Grier, same radius"), (3 * rms_step(0.3), "Crocker-Grier, 3× slow rms")]:
     res[lab] = score(locs, crocker_grier(locs, rad))
 
 fig, ax = plt.subplots(1, 3, figsize=(12, 3.4), gridspec_kw=dict(width_ratios=[1.1, 1, 1]), constrained_layout=True)
@@ -106,8 +74,9 @@ for k, (lab, r) in enumerate(res.items()):
 ax[1].set_xticks(x, names); ax[2].set_xticks(x, names)
 ax[1].set_ylabel("recall of true links"); ax[2].set_ylabel("identity switches per 100 links")
 ax[1].set_title("Recall"); ax[2].set_title("Switches")
-ax[1].legend(frameon=False, fontsize=7.5, loc="upper center", bbox_to_anchor=(1.1, -0.1), ncol=3)
+fig.legend(*ax[1].get_legend_handles_labels(), frameon=False, fontsize=7.5, loc="outside lower center", ncol=3)
 ax[1].set_ylim(0, 1.0)
 save(fig, "fig_02_linking.png")
+print(f"search radius read from the movie: {R:.1f} px (3x fast rms: {R_rule:.1f} px)")
 for k, v in res.items():
     print(k, {n: (round(a, 3), round(b, 2)) for n, (a, b) in v.items()})

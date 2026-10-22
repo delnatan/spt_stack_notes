@@ -5,13 +5,15 @@
 Explainer 03 gives each track a posterior over D. The question a figure in a paper usually answers is about the *population*: how is D distributed across all the particles in a condition? It is tempting to histogram the per-track estimates, or to average the per-track posteriors. Both are wrong in a way that matters, and figure 5.1A shows how.
 
 - **A histogram of per-track estimates** mixes the spread of true D values with each track's measurement noise. Short tracks scatter widely, so two narrow populations come out as two broad humps.
-- **An average of per-track posteriors** has the same problem. It also counts the prior once per track, and it is "the likelihood of nothing": the sum is outside the logarithm, so no model produces it.
+- **An average of per-track posteriors** has the same problem. It also counts the prior once per track, and it is "the likelihood of nothing": it adds the tracks' posteriors, while independent tracks multiply, so no model of the tracks produces it.
 
 The right object is a **hierarchical model**. The population is a density g(u) over u = ln D. Each track's D is drawn from g, and each track's data depend on its own D through the likelihood Lᵢ(u) from explainer 03. Integrating out each track's own D,
 
 $$
 \ell(g) = \sum_i \log \int L_i(u)\, g(u)\, du .
 $$
+
+The order matters. Each track's own D is unknown, so it is averaged out *inside* the integral (the law of total probability). The tracks are independent, so their probabilities multiply, which is the sum of logs *outside*. Putting the log inside instead, Σᵢ log Lᵢ(u), assumes every track has the same u. That is the shared-D model of §1 below.
 
 This uses each track's *likelihood*, not its posterior, so no prior is counted per track. A short, uninformative track has a flat Lᵢ and leaves ℓ(g) unchanged. It cannot drag the population toward the prior the way it drags a histogram of medians.
 
